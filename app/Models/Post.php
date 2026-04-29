@@ -1,12 +1,15 @@
 <?php
 
 namespace App\Models;
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class Post extends Model
 {
+
+    use SoftDeletes;
+
     protected $table = 'posts';
 
     protected $fillable = [
@@ -14,8 +17,8 @@ class Post extends Model
         'content',
         'status',
         'metadata',
+        'likes'
     ];
-
     protected $casts = [
         'metadata' => 'array',
     ];

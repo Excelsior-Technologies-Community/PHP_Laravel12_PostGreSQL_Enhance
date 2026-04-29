@@ -718,4 +718,7 @@ PHP_Laravel12_PostGreSQL_Enhance
 ------------------------------------------------------------------------
 
 Your PHP_Laravel12_PostGreSQL_Enhance Project is now ready!
+<<<<<<< HEAD
 
+=======
+>>>>>>> development
