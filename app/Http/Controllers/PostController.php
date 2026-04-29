@@ -8,9 +8,23 @@ use Illuminate\Http\Request;
 class PostController extends Controller
 {
     //  List Posts
-    public function index()
+    public function index(Request $request)
     {
-        $posts = Post::latest()->paginate(10);
+        $query = Post::query();
+
+        // 🔍 Search by title or content
+        if ($request->search) {
+            $query->where(function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->search . '%')
+                    ->orWhere('content', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        // 📊 Order + Pagination
+        $posts = $query->orderBy('id', 'asc')
+            ->paginate(5)
+            ->withQueryString();
+
         return view('posts.index', compact('posts'));
     }
 
@@ -90,12 +104,57 @@ class PostController extends Controller
             "searchable @@ websearch_to_tsquery('english', ?)",
             [$query]
         )
-        ->orderByRaw(
-            "ts_rank(searchable, websearch_to_tsquery('english', ?)) DESC",
-            [$query]
-        )
-        ->paginate(10);
+            ->orderByRaw(
+                "ts_rank(searchable, websearch_to_tsquery('english', ?)) DESC",
+                [$query]
+            )
+            ->paginate(10);
 
         return view('posts.index', compact('posts'));
     }
+
+    public function like(Post $post)
+    {
+        $post->increment('likes');
+
+        return response()->json([
+            'likes' => $post->likes
+        ]);
+    }
+
+    // Show trash posts
+    public function trash()
+    {
+        $posts = Post::onlyTrashed()->latest()->get();
+        return view('posts.trash', compact('posts'));
+    }
+
+    // Restore post
+    public function restore($id)
+    {
+        Post::onlyTrashed()->findOrFail($id)->restore();
+
+        return redirect()->route('posts.index')
+            ->with('success', 'Post restored successfully');
+    }
+
+    public function favorite(Post $post)
+    {
+        $post->is_favorite = !$post->is_favorite;
+        $post->save();
+
+        return redirect()->back()
+            ->with('success', $post->is_favorite
+                ? 'Added to favorites ❤️'
+                : 'Removed from favorites 💔');
+    }
+
+    public function forceDelete($id)
+    {
+        Post::onlyTrashed()->findOrFail($id)->forceDelete();
+
+        return redirect()->back()
+            ->with('success', 'Post permanently deleted ❌');
+    }
+
 }

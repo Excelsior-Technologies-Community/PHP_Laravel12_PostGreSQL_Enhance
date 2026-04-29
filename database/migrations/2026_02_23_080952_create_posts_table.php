@@ -5,8 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         // Drop trigger & function if they exist (safe)
@@ -22,17 +21,23 @@ return new class extends Migration
             $table->string('title');
             $table->text('content');
 
-            // Status column (for partial index)
+            // Status column
             $table->string('status')->default('draft');
 
-            // JSONB column (supports GIN index)
+            // JSONB column
             $table->jsonb('metadata')->nullable();
 
             // Full Text Search column
             $table->tsvector('searchable')->nullable();
 
-            // Generated slug column
+            // Generated slug
             $table->string('slug')->storedAs('lower(title)');
+
+            // ✅ NEW: Like system
+            $table->integer('likes')->default(0);
+
+            // ✅ NEW: Soft delete (Trash)
+            $table->softDeletes();
 
             $table->timestamps();
 
@@ -43,20 +48,20 @@ return new class extends Migration
             $table->index('searchable', null, 'gin');
         });
 
-        // Expression index (lower title)
+        // Expression index
         DB::statement('
             CREATE INDEX posts_title_lower_idx
             ON posts (lower(title));
         ');
 
-        // Partial index for published posts
+        // Partial index
         DB::statement("
             CREATE INDEX posts_published_idx
             ON posts (status)
             WHERE status = 'published';
         ");
 
-        // Full Text Search Trigger Function
+        // Full Text Search Function
         DB::statement("
             CREATE FUNCTION posts_searchable_trigger() RETURNS trigger AS $$
             BEGIN
@@ -66,7 +71,7 @@ return new class extends Migration
             $$ LANGUAGE plpgsql;
         ");
 
-        // Trigger for full-text search
+        // Trigger
         DB::statement("
             CREATE TRIGGER posts_searchable_update
             BEFORE INSERT OR UPDATE
@@ -78,15 +83,12 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Drop trigger & function first
         DB::statement('DROP TRIGGER IF EXISTS posts_searchable_update ON posts;');
         DB::statement('DROP FUNCTION IF EXISTS posts_searchable_trigger();');
 
-        // Drop expression and partial indexes
         DB::statement('DROP INDEX IF EXISTS posts_title_lower_idx;');
         DB::statement('DROP INDEX IF EXISTS posts_published_idx;');
 
-        // Drop the table
         Schema::dropIfExists('posts');
     }
 };
