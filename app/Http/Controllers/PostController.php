@@ -7,34 +7,50 @@ use Illuminate\Http\Request;
 
 class PostController extends Controller
 {
-    //  List Posts
     public function index(Request $request)
     {
         $query = Post::query();
 
-        // 🔍 Search by title or content
-        if ($request->search) {
+        if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('title', 'like', '%' . $request->search . '%')
-                    ->orWhere('content', 'like', '%' . $request->search . '%');
+                  ->orWhere('content', 'like', '%' . $request->search . '%');
             });
         }
 
-        // 📊 Order + Pagination
-        $posts = $query->orderBy('id', 'asc')
-            ->paginate(5)
-            ->withQueryString();
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $sortField = $request->get('sort', 'created_at');
+        $sortOrder = $request->get('order', 'desc');
+        
+        $allowedSorts = ['title', 'created_at', 'likes'];
+        if (in_array($sortField, $allowedSorts)) {
+            $query->orderBy($sortField, $sortOrder);
+        }
+
+        $posts = $query->paginate(5)->withQueryString();
 
         return view('posts.index', compact('posts'));
     }
 
-    //  Show Create Form
+    public function getSuggestions(Request $request)
+    {
+        $term = $request->get('term');
+        
+        $suggestions = Post::where('title', 'like', '%' . $term . '%')
+                           ->limit(5)
+                           ->pluck('title');
+
+        return response()->json($suggestions);
+    }
+
     public function create()
     {
         return view('posts.create');
     }
 
-    //  Store New Post
     public function store(Request $request)
     {
         $request->validate([
@@ -57,13 +73,11 @@ class PostController extends Controller
             ->with('success', 'Post created successfully');
     }
 
-    //  Show Edit Form
     public function edit(Post $post)
     {
         return view('posts.edit', compact('post'));
     }
 
-    //  Update Post
     public function update(Request $request, Post $post)
     {
         $request->validate([
@@ -86,7 +100,6 @@ class PostController extends Controller
             ->with('success', 'Post updated successfully');
     }
 
-    //  Delete Post
     public function destroy(Post $post)
     {
         $post->delete();
@@ -95,7 +108,6 @@ class PostController extends Controller
             ->with('success', 'Post deleted successfully');
     }
 
-    //  Full Text Search
     public function search(Request $request)
     {
         $query = $request->q;
@@ -122,14 +134,12 @@ class PostController extends Controller
         ]);
     }
 
-    // Show trash posts
     public function trash()
     {
         $posts = Post::onlyTrashed()->latest()->get();
         return view('posts.trash', compact('posts'));
     }
 
-    // Restore post
     public function restore($id)
     {
         Post::onlyTrashed()->findOrFail($id)->restore();
@@ -140,8 +150,7 @@ class PostController extends Controller
 
     public function favorite(Post $post)
     {
-        $post->is_favorite = !$post->is_favorite;
-        $post->save();
+        $post->update(['is_favorite' => !$post->is_favorite]);
 
         return redirect()->back()
             ->with('success', $post->is_favorite
@@ -156,5 +165,4 @@ class PostController extends Controller
         return redirect()->back()
             ->with('success', 'Post permanently deleted ❌');
     }
-
 }
